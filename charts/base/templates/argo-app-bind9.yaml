@@ -1,0 +1,28 @@
+---
+{{- if .Values.bind9.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-app-bind9
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: "https://github.com/karlivory/k8s-on-prem"
+    path: charts/bind9
+    targetRevision: HEAD
+    helm:
+      values: |
+        {{- tpl (toYaml $.Values | nindent 8) $ }}
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: bind9
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+{{- end }}

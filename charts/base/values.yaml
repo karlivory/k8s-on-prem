@@ -1,0 +1,216 @@
+global:
+  externalDomainName: ""
+  ingressIpExternal: ""
+  ingressIpInternal: ""
+  acmeEmailAddress: ""
+
+secrets:
+  # requires valid hmac-sha512 tsig key, generate using:
+  # $ tsig-keygen -a hmac-sha512 | grep "secret" | cut -d'"' -f2
+  bind9tsigKey: ""
+  grafanaAdminPassword: "changeme"
+  
+argocdApplications:
+  argocd:
+    enabled: true
+    name: argocd
+    namespace: argocd
+    helm:
+      repoURL: https://argoproj.github.io/argo-helm 
+      chart: argo-cd
+      targetRevision: v5.41.0 
+      values:
+        redis-ha:
+          enabled: true
+        controller:
+          replicas: 1
+        server:
+          replicas: 2
+        repoServer:
+          replicas: 2
+        applicationSet:
+          replicaCount: 2
+        configs:
+          params:
+            # tls is handled by ingress controller
+            server.insecure: true
+  certManager:
+    enabled: true
+    name: cert-manager
+    namespace: cert-manager
+    helm:
+      repoURL: https://charts.jetstack.io 
+      chart: cert-manager
+      targetRevision: v1.12.2 
+      values:
+        installCRDs: true
+  longhorn:
+    enabled: true
+    name: longhorn
+    namespace: longhorn-system
+    helm:
+      chart: longhorn
+      repoURL: https://charts.longhorn.io
+      targetRevision: v1.4.3
+      values: {}
+  metallb: #x
+    enabled: true
+    name: metallb
+    namespace: metallb
+    helm:
+      chart: metallb 
+      repoURL: https://metallb.github.io/metallb 
+      targetRevision: v0.13.10
+      # https://github.com/longhorn/longhorn/blob/master/chart/values.yaml
+      values: {}
+  externalDns:
+    enabled: true
+    name: external-dns
+    namespace: external-dns
+    helm:
+      chart: external-dns 
+      repoURL: https://charts.bitnami.com/bitnami 
+      targetRevision: v6.20.4
+      # https://github.com/bitnami/charts/blob/main/bitnami/external-dns/values.yaml
+      values:
+        provider: rfc2136
+        logLevel: info
+        interval: "3s"
+        domainFilters: ["{{ .Values.global.externalDomainName }}"]
+        rfc2136:
+          host: bind-primary.bind9.svc.cluster.local
+          zone: "{{ .Values.global.externalDomainName }}"
+          minTTL: 900s
+          txtPrefix: "external-dns-"
+          tsigAxfr: true
+          secretName: tsig-secret
+          tsigKeyname: tsigkey
+          tsigSecretAlg: hmac-sha512
+  reloader:
+    enabled: true
+    name: reloader
+    namespace: reloader
+    helm:
+      chart: reloader
+      repoURL: https://stakater.github.io/stakater-charts 
+      targetRevision: v1.0.31 
+      values: {}
+  kubePrometheusStack:
+    enabled: true
+    name: kube-prometheus-stack
+    namespace: monitoring
+    helm:
+      chart: kube-prometheus-stack
+      repoURL: https://prometheus-community.github.io/helm-charts 
+      targetRevision: v48.1.1
+      # https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml
+      values:
+        grafana: 
+          adminPassword: "{{ .Values.secrets.grafanaAdminPassword }}"
+          additionalDataSources: 
+            - name: Loki
+              type: loki
+              url: http://loki-gateway.monitoring.svc.cluster.local
+              access: proxy
+  loki:
+    enabled: true
+    name: loki
+    namespace: monitoring
+    helm:
+      chart: loki
+      repoURL: https://grafana.github.io/helm-charts 
+      targetRevision: v5.8.8
+      # https://github.com/grafana/loki/blob/main/production/helm/loki/values.yaml
+      values:
+        minio:
+          enabled: true
+        loki:
+          auth_enabled: false
+        write:
+          persistence:
+            size: 2Gi
+        read:
+          persistence:
+            size: 2Gi
+        backend:
+          persistence:
+            size: 2Gi
+        singlebinary:
+          persistence:
+            size: 2Gi
+  promtail:
+    enabled: true
+    name: promtail
+    namespace: monitoring
+    helm:
+      chart: promtail
+      repoURL: https://grafana.github.io/helm-charts 
+      targetRevision: v6.11.6
+      # https://github.com/grafana/helm-charts/blob/main/charts/promtail/values.yaml
+      values:
+        config:
+          clients:
+            - url: http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push
+  traefik:
+    enabled: true
+    name: traefik
+    namespace: traefik
+    helm:
+      chart: traefik
+      repoURL: https://helm.traefik.io/traefik 
+      targetRevision: v23.1.0
+      # https://github.com/traefik/traefik-helm-chart/blob/master/traefik/values.yaml
+      values:
+        deployment:
+          replicas: 2
+        service:
+          annotations:
+            metallb.universe.tf/allow-shared-ip: "shared-ip"
+          spec:
+            loadBalancerIP: "{{ .Values.global.ingressIpInternal }}"
+            externalTrafficPolicy: Cluster
+        providers:
+          kubernetesIngress:
+            publishedService:
+              enabled: true
+
+ingresses:
+  - name: argocd-ingress
+    namespace: argocd
+    host: "argocd.{{ .Values.global.externalDomainName }}"
+    externalDnsTarget: "traefik.{{ .Values.global.externalDomainName }}"
+    service:
+      name: argocd-app-argocd-server
+      port: 80
+  - name: grafana-ingress
+    namespace: monitoring
+    host: "grafana.{{ .Values.global.externalDomainName }}"
+    externalDnsTarget: "traefik.{{ .Values.global.externalDomainName }}"
+    service:
+      name: argocd-app-kube-prometheus-stack-grafana
+      port: 80
+
+bind9:
+  enabled: true
+  primaryClusterIP: "10.100.0.53"
+  secondaryReplicas: 4
+  zonefile: |
+    ;
+    ; {{ .Values.global.externalDomainName }} DNS Domain Zone File
+    ;
+    $ORIGIN .
+    $TTL 3600
+    {{ .Values.global.externalDomainName }} IN  SOA ns.{{ .Values.global.externalDomainName }}. root.{{ .Values.global.externalDomainName }}. (
+                SERIALNUMBER  ; Serial
+                10            ; refresh
+                10            ; retry
+                3600          ; expire
+                3600          ; negative cache ttl
+                )
+    ;
+            NS  ns.{{ .Values.global.externalDomainName }}.
+    ;
+    $ORIGIN {{ .Values.global.externalDomainName }}.
+    ;
+    ns        IN  A   {{ .Values.global.ingressIpExternal }}
+    traefik   IN  A   {{ .Values.global.ingressIpExternal }}

@@ -1,0 +1,260 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bind9
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tsig-secret
+  namespace: bind9
+stringData:
+  rfc2136_tsig_secret: "{{ .Values.secrets.bind9tsigKey }}"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bind-primary-config
+  namespace: bind9
+data:
+  named.conf: |
+    include "/var/bind/tsigkey.key";
+    options {
+        pid-file "/var/bind/named.pid";
+        allow-recursion { 127.0.0.1; 10.0.0.0/8; 192.168.0.0/16; 172.16.0.0/12; };
+        allow-update { key tsigkey; };
+    };
+    zone "{{ .Values.global.externalDomainName }}" {
+        type master;
+        file "/var/bind/k8s.zone";
+        allow-transfer { any; };
+        update-policy {
+            grant tsigkey zonesub ANY;
+        };
+    };
+  tsigkey.key.template: |
+    key "tsigkey" {
+      algorithm hmac-sha512;
+      secret "TSIGKEY";
+    };
+  k8s.zone: |
+    {{ tpl .Values.bind9.zonefile . | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bind-secondary-config
+  namespace: bind9
+data:
+  named.conf: |
+    options {
+        pid-file "/var/bind/named.pid";
+        allow-recursion { 127.0.0.1; 10.0.0.0/8; 192.168.0.0/16; 172.16.0.0/12; };
+    };
+    zone "{{ .Values.global.externalDomainName }}" {
+        type slave;
+        file "/var/bind/k8s.zone";
+        masters { {{ .Values.bind9.primaryClusterIP }}; };
+        min-refresh-time 10;
+    };
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bind-primary
+  namespace: bind9
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bind-primary
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: bind-primary
+    spec:
+      volumes:
+        - name: volume-etc-bind
+          projected:
+            sources:
+              - configMap:
+                  name: bind-primary-config
+              - secret:
+                  name: tsig-secret
+            defaultMode: 0777
+        - name: volume-var-bind
+          emptyDir: {}
+      initContainers:
+        - name: init-myservice
+          image: busybox
+          command:
+            - sh
+            - '-c'
+            - 'export TIMESTAMP=$(date +%s) && mkdir -p /var/bind/ && cp /etc/bind/k8s.zone /var/bind/k8s.zone && sed "s#TSIGKEY#$TSIGKEY#g" /etc/bind/tsigkey.key.template > /var/bind/tsigkey.key && sed -i "s/SERIALNUMBER/$TIMESTAMP/g" /var/bind/k8s.zone'
+          volumeMounts:
+            - name: volume-etc-bind
+              mountPath: /etc/bind
+            - name: volume-var-bind
+              mountPath: /var/bind
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TSIGKEY
+              valueFrom:
+                secretKeyRef:
+                  name: tsig-secret 
+                  key: rfc2136_tsig_secret
+      containers:
+        - name: bind-primary
+          image: ubuntu/bind9:9.18-22.04_beta
+          workingDir: /var/bind
+          env:
+            - name: BIND9_USER
+              value: root
+          volumeMounts:
+            - name: volume-etc-bind
+              readOnly: true
+              mountPath: /etc/bind
+            - name: volume-var-bind
+              mountPath: /var/bind
+          imagePullPolicy: IfNotPresent
+          ports:
+          - name: dns-tcp
+            containerPort: 53
+            protocol: TCP
+          - name: dns-udp
+            containerPort: 53
+            protocol: UDP
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+  revisionHistoryLimit: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bind-secondary
+  namespace: bind9
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: {{ .Values.bind9.secondaryReplicas }}
+  selector:
+    matchLabels:
+      app: bind-secondary
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: bind-secondary
+    spec:
+      volumes:
+        - name: volume-etc-bind
+          projected:
+            sources:
+              - configMap:
+                  name: bind-secondary-config
+            defaultMode: 0777
+        - name: volume-var-bind
+          emptyDir: {}
+      initContainers:
+        - name: init-myservice
+          image: busybox
+          command:
+            - sh
+            - '-c'
+            - 'mkdir -p /var/bind/ && touch /var/bind/bind.conf'
+          volumeMounts:
+            - name: volume-etc-bind
+              mountPath: /etc/bind
+            - name: volume-var-bind 
+              mountPath: /var/bind
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TSIGKEY
+              valueFrom:
+                secretKeyRef:
+                  name: tsig-secret
+                  key: rfc2136_tsig_secret
+      containers:
+        - name: bind-secondary
+          image: ubuntu/bind9:9.18-22.04_beta
+          workingDir: /var/bind
+          readinessProbe:
+            exec:
+              command:
+              - sh
+              - '-c'
+              - 'sleep 10'
+            timeoutSeconds: 20
+          env:
+            - name: BIND9_USER
+              value: root # TODO
+          volumeMounts:
+            - name: volume-etc-bind
+              readOnly: true
+              mountPath: /etc/bind
+            - name: volume-var-bind
+              mountPath: /var/bind
+          imagePullPolicy: IfNotPresent
+          ports:
+          - name: dns-tcp
+            containerPort: 53
+            protocol: TCP
+          - name: dns-udp
+            containerPort: 53
+            protocol: UDP
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  revisionHistoryLimit: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bind-secondary
+  namespace: bind9
+  annotations:
+    metallb.universe.tf/allow-shared-ip: "shared-ip"
+spec:
+  type: LoadBalancer
+  loadBalancerIP: "{{ .Values.global.ingressIpInternal }}"
+  externalTrafficPolicy: Cluster
+  ports:
+    - name: dns-tcp
+      protocol: TCP
+      port: 53
+      targetPort: 53
+    - name: dns-udp
+      protocol: UDP
+      port: 53
+      targetPort: 53
+  selector:
+    app: bind-secondary
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bind-primary
+  namespace: bind9
+spec:
+  type: ClusterIP
+  clusterIP: "{{ .Values.bind9.primaryClusterIP }}"
+  ports:
+    - name: dns-tcp
+      protocol: TCP
+      port: 53
+      targetPort: 53
+    - name: dns-udp
+      protocol: UDP
+      port: 53
+      targetPort: 53
+  selector:
+    app: bind-primary
+

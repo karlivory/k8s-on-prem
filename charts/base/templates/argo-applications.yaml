@@ -1,0 +1,31 @@
+{{- range $appname, $app := .Values.argocdApplications }}
+{{- if $app.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: "argocd-app-{{ $app.name }}"
+  namespace: argocd
+spec:
+  project: default
+  source:
+    chart: {{ $app.helm.chart }}
+    repoURL: {{ $app.helm.repoURL }}
+    targetRevision: {{ $app.helm.targetRevision }}
+    helm:
+      values: |
+        {{- tpl (toYaml $app.helm.values | nindent 8) $ }}
+  destination:
+    server: "https://kubernetes.default.svc"
+    namespace: {{ $app.namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+{{- end }}
+{{- end }}
+

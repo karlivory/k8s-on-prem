@@ -1,0 +1,11 @@
+global:
+  externalDomainName: ""
+  ingressIpExternal: ""
+  ingressIpInternal: ""
+  acmeEmailAddress: ""
+
+secrets:
+  # valid hmac-sha512 tsig key
+  bind9tsigKey: ""
+  
+ingresses: []
