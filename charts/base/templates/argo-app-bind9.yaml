@@ -3,7 +3,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: argocd-app-bind9
+  name: bind9
   namespace: argocd
 spec:
   project: default
