@@ -8,24 +8,16 @@ bind9:
   enabled: true
   primaryClusterIP: "10.100.0.53"
   secondaryReplicas: 4
-  # passed through tpl
-  zonefile: |
-    ;
-    ; {{ .Values.global.externalDomainName }} DNS Domain Zone File
-    ;
-    $ORIGIN .
-    $TTL 3600
-    {{ .Values.global.externalDomainName }} IN  SOA ns.{{ .Values.global.externalDomainName }}. root.{{ .Values.global.externalDomainName }}. (
-                SERIALNUMBER  ; Serial
-                10            ; refresh
-                10            ; retry
-                3600          ; expire
-                3600          ; negative cache ttl
-                )
-    ;
-            NS  ns.{{ .Values.global.externalDomainName }}.
-    ;
-    $ORIGIN {{ .Values.global.externalDomainName }}.
-    ;
-    ns        IN  A   {{ .Values.global.ingressIpExternal }}
-    traefik   IN  A   {{ .Values.global.ingressIpExternal }}
+  zone:
+    refresh: 10
+    retry: 10
+    expire: 3600
+    negativeCacheTtl: 3600
+    # passed through tpl
+    dnsRecords:
+      - name: ns
+        type: A
+        value: "{{ .Values.global.ingressIpExternal }}"
+      - name: traefik
+        type: A
+        value: "{{ .Values.global.ingressIpExternal }}"

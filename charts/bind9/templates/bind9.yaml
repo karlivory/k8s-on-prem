@@ -39,7 +39,26 @@ data:
       secret "TSIGKEY";
     };
   k8s.zone: |
-    {{ tpl .Values.bind9.zonefile . | nindent 4 }}
+    ;
+    ; {{ .Values.global.externalDomainName }} DNS Domain Zone File
+    ;
+    $ORIGIN .
+    $TTL 3600
+    {{ .Values.global.externalDomainName }} IN  SOA ns.{{ .Values.global.externalDomainName }}. root.{{ .Values.global.externalDomainName }}. (
+                SERIALNUMBER  ; Serial
+                {{ .Values.bind9.zone.refresh }}            ; refresh
+                {{ .Values.bind9.zone.retry }}              ; retry
+                {{ .Values.bind9.zone.expire }}             ; expire
+                {{ .Values.bind9.zone.negativeCacheTtl }}   ; negative cache ttl
+                )
+    ;
+            NS  ns.{{ .Values.global.externalDomainName }}.
+    ;
+    $ORIGIN {{ .Values.global.externalDomainName }}.
+    ;
+    {{- range .Values.bind9.zone.dnsRecords }}
+    {{ tpl .name $ }}    IN  {{ tpl .type $ }}   {{ tpl .value $ }}
+    {{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap
