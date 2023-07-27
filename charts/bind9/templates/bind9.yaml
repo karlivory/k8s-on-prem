@@ -22,7 +22,7 @@ data:
     include "/var/bind/tsigkey.key";
     options {
         pid-file "/var/bind/named.pid";
-        allow-recursion { 127.0.0.1; 10.0.0.0/8; 192.168.0.0/16; 172.16.0.0/12; };
+        recursion no;
         allow-update { key tsigkey; };
     };
     zone "{{ .Values.global.externalDomainName }}" {
@@ -69,7 +69,7 @@ data:
   named.conf: |
     options {
         pid-file "/var/bind/named.pid";
-        allow-recursion { 127.0.0.1; 10.0.0.0/8; 192.168.0.0/16; 172.16.0.0/12; };
+        recursion no;
     };
     zone "{{ .Values.global.externalDomainName }}" {
         type slave;
