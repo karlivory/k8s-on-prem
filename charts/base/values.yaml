@@ -10,6 +10,7 @@ secrets:
   bind9tsigKey: ""
   grafanaAdminPassword: "changeme"
   
+argocdProjectName: default
 argocdApplications:
   argocd:
     enabled: true

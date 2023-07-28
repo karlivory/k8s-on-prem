@@ -6,7 +6,7 @@ metadata:
   name: bind9
   namespace: argocd
 spec:
-  project: default
+  project: "{{ .Values.argocdProjectName }}"
   source:
     repoURL: "https://github.com/karlivory/k8s-on-prem"
     path: charts/bind9

@@ -7,7 +7,7 @@ metadata:
   name: "{{ $app.name }}"
   namespace: argocd
 spec:
-  project: default
+  project: "{{ .Values.argocdProjectName }}"
   source:
     chart: {{ $app.helm.chart }}
     repoURL: {{ $app.helm.repoURL }}
