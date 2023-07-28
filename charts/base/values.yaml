@@ -1,3 +1,23 @@
+# This chart expects some prerequisites to be satisfied. Supposing
+#
+# global.externalDomainName = k8s.example.com
+# global.ingressIpExternal  = 1.2.3.4
+# global.ingressIpInternal  = 192.168.0.4
+#
+# then there should be DNS records:
+#
+# k8s.example.com     in  NS   ns.k8s.example.com
+# ns.k8s.example.com  in  A    1.2.3.4
+#
+# Additionally, ingressIpExternal != ingressIpInternal, then the
+# following routing rules (e.g. gateway port-forwards) should be in place:
+#
+# 1.2.3.4 -> 80/tcp  -> 192.168.0.4 (80/tcp)
+# 1.2.3.4 -> 443/tcp -> 192.168.0.4 (443/tcp)
+# 1.2.3.4 -> 53/tcp  -> 192.168.0.4 (53/tcp)
+# 1.2.3.4 -> 53/udp  -> 192.168.0.4 (53/udp)
+#
+
 global:
   externalDomainName: ""
   ingressIpExternal: ""
@@ -5,12 +25,17 @@ global:
   acmeEmailAddress: ""
 
 secrets:
-  # requires valid hmac-sha512 tsig key, generate using:
+  # A valid hmac-sha512 tsig key, e.g.,
+  # yOQnD4gYPs1MJiDpVdRB1Ws54PjHdvJrUVCAtn0UUTaQoRNAGcvgulMX8ZDK6Yo3+SUI0QuUos1f2jDgIyhBrQ==
+  # To generate, you can run:
   # $ tsig-keygen -a hmac-sha512 | grep "secret" | cut -d'"' -f2
   bind9tsigKey: ""
+  # Admin password for grafana (accessible at https://grafana.< externalDomainName >)
   grafanaAdminPassword: "changeme"
   
+# Destination of all the argocdApplications
 argocdProjectName: default
+# Dictionary of argocd helm Applications; for each the helm.values dict is passed through tpl
 argocdApplications:
   argocd:
     enabled: true
@@ -20,6 +45,7 @@ argocdApplications:
       repoURL: https://argoproj.github.io/argo-helm 
       chart: argo-cd
       targetRevision: v5.41.0 
+      # https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/values.yaml
       values:
         redis-ha:
           enabled: true
@@ -43,6 +69,7 @@ argocdApplications:
       repoURL: https://charts.jetstack.io 
       chart: cert-manager
       targetRevision: v1.12.2 
+      # https://github.com/cert-manager/cert-manager/blob/master/deploy/charts/cert-manager/values.yaml
       values:
         installCRDs: true
   longhorn:
@@ -53,6 +80,7 @@ argocdApplications:
       chart: longhorn
       repoURL: https://charts.longhorn.io
       targetRevision: v1.4.3
+      # https://github.com/longhorn/charts/blob/master/charts/longhorn/values.yaml
       values: {}
   metallb:
     enabled: true
@@ -62,7 +90,7 @@ argocdApplications:
       chart: metallb 
       repoURL: https://metallb.github.io/metallb 
       targetRevision: v0.13.10
-      # https://github.com/longhorn/longhorn/blob/master/chart/values.yaml
+      # https://github.com/metallb/metallb/blob/main/charts/metallb/values.yaml
       values: {}
   externalDns:
     enabled: true
@@ -95,6 +123,7 @@ argocdApplications:
       chart: reloader
       repoURL: https://stakater.github.io/stakater-charts 
       targetRevision: v1.0.31 
+      # https://github.com/stakater/Reloader/blob/master/deployments/kubernetes/chart/reloader/values.yaml
       values: {}
   kubePrometheusStack:
     enabled: true
@@ -193,6 +222,9 @@ ingresses:
 
 bind9:
   enabled: true
+  # The bind9 primary (master) server needs to have a static ip, since 
+  # /etc/bind/named.conf does not accept dns names in its "masters { <master-ip> };"
+  # Make sure this value is within your kubernetes internal-ip range.
   primaryClusterIP: "10.100.0.53"
   secondaryReplicas: 4
   zone:
