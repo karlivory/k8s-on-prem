@@ -53,10 +53,10 @@ argocdApplications:
       repoURL: https://charts.longhorn.io
       targetRevision: v1.4.3
       values: {}
-  metallb: #x
+  metallb:
     enabled: true
     name: metallb
-    namespace: metallb
+    namespace: metallb-system
     helm:
       chart: metallb 
       repoURL: https://metallb.github.io/metallb 

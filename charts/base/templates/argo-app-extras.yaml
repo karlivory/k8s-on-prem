@@ -15,7 +15,7 @@ spec:
         {{- tpl (toYaml $.Values | nindent 8) $ }}
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: bind9
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true
