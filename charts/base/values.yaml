@@ -215,7 +215,7 @@ argocdApplications:
       values:
         controller:
           extraArgs:
-            default-ssl-certificate: ingres-nginx/wildcard-tls
+            default-ssl-certificate: ingress-nginx/wildcard-tls
           ingressClassResource:
             default: true
           service:
