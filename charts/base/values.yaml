@@ -214,6 +214,8 @@ argocdApplications:
       # https://github.com/kubernetes/ingress-nginx/blob/main/charts/ingress-nginx/values.yaml
       values:
         controller:
+          annotations:
+            metallb.universe.tf/allow-shared-ip: "shared-ip"
           resources:
             requests:
               cpu: 300m
