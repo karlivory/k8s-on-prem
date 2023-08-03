@@ -7,6 +7,7 @@ metadata:
 type: Opaque
 stringData:
   rfc2136_tsig_secret: "{{ .Values.secrets.bind9tsigKey }}"
+
 ---
 apiVersion: v1
 kind: Secret
@@ -16,26 +17,28 @@ metadata:
 type: Opaque
 stringData:
   rfc2136_tsig_secret: "{{ .Values.secrets.bind9tsigKey }}"
----
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-staging
-spec:
-  acme:
-    email: "{{ .Values.global.acmeEmailAddress }}"
-    server: https://acme-staging-v02.api.letsencrypt.org/directory 
-    privateKeySecretRef:
-      name: letsencrypt-staging-account-key
-    solvers:
-    - dns01:
-        rfc2136:
-          nameserver: bind-primary.bind9.svc.cluster.local
-          tsigKeyName: tsigkey
-          tsigAlgorithm: HMACSHA512
-          tsigSecretSecretRef:
-            name: tsig-secret
-            key: rfc2136_tsig_secret 
+
+# ---
+# apiVersion: cert-manager.io/v1
+# kind: ClusterIssuer
+# metadata:
+#   name: letsencrypt-staging
+# spec:
+#   acme:
+#     email: "{{ .Values.global.acmeEmailAddress }}"
+#     server: https://acme-staging-v02.api.letsencrypt.org/directory 
+#     privateKeySecretRef:
+#       name: letsencrypt-staging-account-key
+#     solvers:
+#     - dns01:
+#         rfc2136:
+#           nameserver: bind-primary.bind9.svc.cluster.local
+#           tsigKeyName: tsigkey
+#           tsigAlgorithm: HMACSHA512
+#           tsigSecretSecretRef:
+#             name: tsig-secret
+#             key: rfc2136_tsig_secret 
+
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -56,28 +59,30 @@ spec:
           tsigSecretSecretRef:
             name: tsig-secret
             key: rfc2136_tsig_secret
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: wildcard-tls-staging
-  namespace: traefik
-spec:
-  dnsNames:
-    - "*.{{ .Values.global.externalDomainName }}"
-  issuerRef:
-    kind: ClusterIssuer
-    name: letsencrypt-staging
-  secretName: wildcard-tls-staging
-  usages:
-    - digital signature
-    - key encipherment
+
+# ---
+# apiVersion: cert-manager.io/v1
+# kind: Certificate
+# metadata:
+#   name: wildcard-tls-staging
+#   namespace: traefik
+# spec:
+#   dnsNames:
+#     - "*.{{ .Values.global.externalDomainName }}"
+#   issuerRef:
+#     kind: ClusterIssuer
+#     name: letsencrypt-staging
+#   secretName: wildcard-tls-staging
+#   usages:
+#     - digital signature
+#     - key encipherment
+#
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: wildcard-tls
-  namespace: traefik
+  namespace: ingress-nginx
 spec:
   dnsNames:
     - "*.{{ .Values.global.externalDomainName }}"
@@ -88,16 +93,17 @@ spec:
   usages:
     - digital signature
     - key encipherment
----
-apiVersion: traefik.containo.us/v1alpha1
-kind: TLSStore
-metadata:
-  name: default
-  namespace: traefik
-spec:
-  defaultCertificate:
-    secretName: wildcard-tls
-  certificates:
-    - secretName: wildcard-tls
-    - secretName: wildcard-tls-staging
+
+# ---
+# apiVersion: traefik.containo.us/v1alpha1
+# kind: TLSStore
+# metadata:
+#   name: default
+#   namespace: traefik
+# spec:
+#   defaultCertificate:
+#     secretName: wildcard-tls
+#   certificates:
+#     - secretName: wildcard-tls
+#     - secretName: wildcard-tls-staging
 

@@ -214,6 +214,8 @@ argocdApplications:
       # https://github.com/kubernetes/ingress-nginx/blob/main/charts/ingress-nginx/values.yaml
       values:
         controller:
+          ingressClassResource:
+            default: true
           service:
             loadBalancerIP: "{{ .Values.global.ingressIpInternal }}"
             annotations:
