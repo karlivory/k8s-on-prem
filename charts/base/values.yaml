@@ -214,6 +214,8 @@ argocdApplications:
       # https://github.com/kubernetes/ingress-nginx/blob/main/charts/ingress-nginx/values.yaml
       values:
         controller:
+          extraArgs:
+            default-ssl-certificate: ingres-nginx/wildcard-tls
           ingressClassResource:
             default: true
           service:
