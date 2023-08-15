@@ -98,23 +98,29 @@ argocdApplications:
     namespace: external-dns
     helm:
       chart: external-dns 
-      repoURL: https://charts.bitnami.com/bitnami 
-      targetRevision: v6.20.4
-      # https://github.com/bitnami/charts/blob/main/bitnami/external-dns/values.yaml
+      repoURL: https://kubernetes-sigs.github.io/external-dns
+      targetRevision: v1.12.2
+      # https://github.com/kubernetes-sigs/external-dns/blob/master/charts/external-dns/values.yaml
       values:
         provider: rfc2136
-        logLevel: info
         interval: "3s"
+        txtPrefix: "external-dns-"
+        txtOwnerId: k8s
         domainFilters: ["{{ .Values.global.externalDomainName }}"]
-        rfc2136:
-          host: bind-primary.bind9.svc.cluster.local
-          zone: "{{ .Values.global.externalDomainName }}"
-          minTTL: 900s
-          txtPrefix: "external-dns-"
-          tsigAxfr: true
-          secretName: tsig-secret
-          tsigKeyname: tsigkey
-          tsigSecretAlg: hmac-sha512
+        extraArgs:
+          - --rfc2136-min-ttl=900s
+          - --rfc2136-host=bind-primary.bind9.svc.cluster.local
+          - --rfc2136-port=53
+          - --rfc2136-zone={{ .Values.global.externalDomainName }}
+          - --rfc2136-tsig-secret-alg=hmac-sha512
+          - --rfc2136-tsig-keyname=tsigkey
+          - --rfc2136-tsig-axfr
+        env:
+          - name: EXTERNAL_DNS_RFC2136_TSIG_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: tsig-secret
+                key: rfc2136_tsig_secret 
   reloader:
     enabled: true
     name: reloader
