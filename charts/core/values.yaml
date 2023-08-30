@@ -211,7 +211,8 @@ argocdApplications:
           extraArgs:
             default-ssl-certificate: cert-manager/wildcard-tls
           ingressClassResource:
-            default: true
+            name: ingress1
+            default: false
           service:
             loadBalancerIP: "{{ .Values.global.ingressIP1 }}"
             annotations:
@@ -235,11 +236,10 @@ argocdApplications:
           extraArgs:
             default-ssl-certificate: cert-manager/wildcard-tls
           ingressClassResource:
-            default: false
+            name: ingress2
+            default: true
           service:
             loadBalancerIP: "{{ .Values.global.ingressIP2 }}"
-            annotations:
-              metallb.universe.tf/allow-shared-ip: "shared-ip"
           resources:
             requests:
               cpu: 300m
