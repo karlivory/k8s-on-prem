@@ -175,12 +175,13 @@ argocdApplications:
           persistence:
             size: 2Gi
     ignoreDifferences:
-      - group: "apps"
-        kind: "StatefulSet"
+      - group: apps
+        kind: StatefulSet
         jqPathExpressions:
           - .spec.volumeClaimTemplates[].apiVersion
           - .spec.volumeClaimTemplates[].kind
       - group: monitoring.coreos.com
+        kind: ServiceMonitor
         jqPathExpressions:
           - .spec.endpoints[]?.relabelings[]?.action
       
