@@ -184,7 +184,12 @@ argocdApplications:
         kind: ServiceMonitor
         jqPathExpressions:
           - .spec.endpoints[]?.relabelings[]?.action
-      
+      - group: monitoring.grafana.com
+        kind: PodLogs
+        jqPathExpressions:
+          - .spec.relabelings[]?.action
+          - .spec.relabelings[]?.sourceLabels
+          - .spec.relabelings[]?.replacement
   promtail:
     enabled: true
     name: promtail
