@@ -247,6 +247,8 @@ argocdApplications:
           replicaCount: 3
   bind9:
     enabled: true
+    name: bind9
+    namespace: bind9
     helm:
       repoURL: https://github.com/karlivory/helm-charts
       path: charts/bind9
