@@ -1,0 +1,8 @@
+global:
+  domain: ""
+  ingressIP1: ""
+  ingressIP2: ""
+  externalIP: ""
+  acmeEmailAddress: ""
+
+ingresses: []
