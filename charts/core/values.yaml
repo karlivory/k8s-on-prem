@@ -252,7 +252,7 @@ argocdApplications:
     helm:
       chart: bind9
       repoURL: https://karlivory.github.io/helm-charts
-      targetRevision: v0.1.0
+      targetRevision: v0.1.2
       # https://github.com/karlivory/helm-charts/blob/main/charts/bind9/values.yaml
       values:
         secondary:
